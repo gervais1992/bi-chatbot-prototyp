@@ -1,0 +1,18 @@
+# Geheimnisse -- NIEMALS einchecken
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Erzeugte Daten (per `python create_data.py` reproduzierbar)
+data/*.duckdb
+data/*.csv
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

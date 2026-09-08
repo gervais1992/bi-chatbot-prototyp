@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# BI-Chatbot-Prototyp
+#
+# Standard (empfohlen):   docker compose up
+#     Die Anwendung laeuft im Container, Ollama auf dem Host. So bleibt die
+#     Hardwarebeschleunigung erhalten (auf dem Mac nutzt Ollama Metal, was
+#     einem Linux-Container nicht zur Verfuegung steht).
+#
+# Alles im Container:     docker compose --profile ollama up
+#     Zusaetzlich laeuft Ollama als Dienst. Vollstaendig eigenstaendig, aber
+#     ohne GPU-Beschleunigung deutlich langsamer. Das Modell muss einmalig
+#     geladen werden:
+#         docker compose --profile ollama exec ollama ollama pull llama3.2:3b
+#
+# Danach jeweils:  http://localhost:8501
+# ---------------------------------------------------------------------------
+
+services:
+  app:
+    build: .
+    image: bi-chatbot:latest
+    container_name: bi-chatbot
+    ports:
+      - "8501:8501"
+    environment:
+      # Standard: Ollama laeuft auf dem Host.
+      # Bei "--profile ollama" per Kommandozeile ueberschreiben oder die
+      # auskommentierte Zeile unten verwenden.
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434/v1"
+      # OLLAMA_BASE_URL: "http://ollama:11434/v1"   # fuer Profil "ollama"
+      OLLAMA_MODEL: "llama3.2:3b"
+      BI_MODEL: "claude-sonnet-5"
+    env_file:
+      # Optional: Schluessel fuer den Cloud-Modus. Fehlt die Datei, startet
+      # der Container trotzdem (Demo- und Lokal-Modus brauchen sie nicht).
+      - path: .env
+        required: false
+    extra_hosts:
+      # Unter Linux ist host.docker.internal nicht automatisch vorhanden.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # Nur aktiv mit:  docker compose --profile ollama up
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    container_name: bi-chatbot-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Heruntergeladene Modelle ueberleben einen Neustart des Containers.
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama-models:

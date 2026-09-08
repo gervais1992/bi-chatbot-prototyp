@@ -1,0 +1,34 @@
+# Nicht ins Abbild kopieren -- haelt es klein und verhindert, dass
+# Geheimnisse versehentlich im Container landen.
+
+# Geheimnisse
+.env
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+
+# Python-Artefakte
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Erzeugte Daten (werden beim Bauen neu erzeugt)
+data/
+
+# Werkzeuge und Editoren
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+.claude/
+.agents/
+
+# Dokumentation und Container-Dateien selbst
+README*.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.pdf
+*.tex
