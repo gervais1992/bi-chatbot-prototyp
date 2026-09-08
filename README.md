@@ -278,3 +278,6 @@ tests/
 - Plusieurs actions par message
 - Persistance de l'historique du dialogue
 - Comparaison mode LLM vs mode démo dans l'évaluation
+
+
+Yug et Gervais
