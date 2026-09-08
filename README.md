@@ -280,4 +280,3 @@ tests/
 - Comparaison mode LLM vs mode démo dans l'évaluation
 
 
-Yug et Gervais
