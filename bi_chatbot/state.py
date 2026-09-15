@@ -25,6 +25,7 @@ class AnalysisContext:
     region: str | None = None                 # 'Inland' | 'Ausland' | None
     quartal: int | None = None                 # 1..4, None = alle Quartale
     kategorie: str | None = None               # Hardware | Software | Service
+    prognose_jahre: list[int] = field(default_factory=list)  # extrapolierte Jahre
     group_by: str = "monat"                    # Zeitachse, siehe GROUPINGS
     nur_werktage: bool = False                 # Wochenenden ausblenden
     chart_type: str = "line"                   # 'line' | 'bar'
@@ -63,6 +64,8 @@ class AnalysisContext:
             f += f" · nur Q{self.quartal}"
         if self.kategorie:
             f += f" · {self.kategorie}"
+        if self.prognose_jahre:
+            f += " · inkl. Prognose " + ", ".join(str(j) for j in self.prognose_jahre)
         if self.nur_werktage:
             f += " · nur Werktage"
         t = {"line": "Linie", "bar": "Säulen"}.get(self.chart_type, self.chart_type)

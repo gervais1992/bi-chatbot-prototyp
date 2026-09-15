@@ -362,3 +362,57 @@ def test_mehrjahresabfrage_in_einer_nachricht():
     nlu.apply(interp, ctx)
     assert ctx.group_by == "jahr"
     assert [s.key for s in ctx.series] == ["umsatz"]
+
+
+# --- Prognose ------------------------------------------------------------
+def test_jahr_ohne_daten_wird_gemeldet():
+    """Ein Jahr ausserhalb des Bestands darf nicht stillschweigend ignoriert werden."""
+    ctx = AnalysisContext()
+    antwort = nlu.apply(nlu.interpret_rule_based("Zeige den Umsatz von 2016.", ctx), ctx)
+    assert "2016" in antwort and "keine Daten" in antwort
+    assert ctx.series == []
+
+
+def test_set_filter_lehnt_unbekanntes_jahr_ab():
+    import pytest
+    ctx = AnalysisContext()
+    with pytest.raises(ValueError):
+        sem.set_filter(ctx, jahr=1999)
+
+
+def test_prognose_ergaenzt_zukunftsjahre():
+    from bi_chatbot import forecast
+    labels = ["2023", "2024", "2025"]
+    base = {"umsatz": [10.0, 12.0, 14.0]}
+    neu, werte, prog = forecast.predict(labels, base, [2026])
+    assert neu == ["2023", "2024", "2025", "2026"]
+    assert prog == {"2026"}
+    assert werte["umsatz"][3] > werte["umsatz"][2]   # Trend fortgeschrieben
+    assert werte["umsatz"][:3] == [10.0, 12.0, 14.0]  # Messwerte unveraendert
+
+
+def test_prognose_wird_im_text_gekennzeichnet():
+    from bi_chatbot import forecast, narrative
+    from bi_chatbot.db import load_base_measures
+    ctx = AnalysisContext()
+    sem.show_measure(ctx, "umsatz")
+    sem.set_prognose(ctx, [2026])
+    labels, base = load_base_measures(ctx)
+    labels, base, prog = forecast.predict(labels, base, ctx.prognose_jahre)
+    text = narrative.describe(ctx, labels, base, prognose=prog)
+    assert "(Prognose)" in text
+
+
+def test_rueckrechnung_wird_als_unbelastbar_gekennzeichnet():
+    from bi_chatbot import forecast
+    hinweis = forecast.guete_hinweis(["2023", "2024", "2025"],
+                                     [10e6, 12e6, 14e6], [2016])
+    assert "nicht belastbar" in hinweis
+
+
+def test_prognose_aufheben():
+    ctx = AnalysisContext()
+    sem.set_prognose(ctx, [2026])
+    assert ctx.prognose_jahre == [2026]
+    sem.set_prognose(ctx, [])
+    assert ctx.prognose_jahre == []

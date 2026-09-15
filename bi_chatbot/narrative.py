@@ -34,7 +34,8 @@ def _prozent(neu: float, alt: float) -> str | None:
 
 
 def describe(ctx: AnalysisContext, labels: list[str],
-             base: dict[str, list[float]], max_punkte: int = 6) -> str:
+             base: dict[str, list[float]], max_punkte: int = 6,
+             prognose: set[str] | None = None) -> str:
     """Erzeugt eine kurze Beschreibung der aktuell dargestellten Daten."""
     if not ctx.series or not labels:
         return ""
@@ -46,6 +47,7 @@ def describe(ctx: AnalysisContext, labels: list[str],
 
     achse = sem.GROUPINGS.get(ctx.group_by)
     achsen_name = achse.label if achse else ctx.group_by
+    prognose = prognose or set()
     teile: list[str] = []
 
     # Veraenderungsraten sind nur bei geordneten (Zeit-)Achsen sinnvoll.
@@ -57,6 +59,8 @@ def describe(ctx: AnalysisContext, labels: list[str],
         posten = []
         for i, (lab, wert) in enumerate(zip(labels, werte)):
             eintrag = f"{lab}: {_zahl(wert)}"
+            if lab in prognose:
+                eintrag += " *(Prognose)*"
             if zeitachse and i > 0:
                 p = _prozent(wert, werte[i - 1])
                 if p:

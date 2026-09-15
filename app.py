@@ -15,7 +15,7 @@ import streamlit as st
 from bi_chatbot import interpreter as nlu
 from bi_chatbot.charts import build_figure
 from bi_chatbot.db import load_base_measures
-from bi_chatbot import narrative
+from bi_chatbot import narrative, forecast
 from bi_chatbot.state import AnalysisContext
 
 # --- Konfiguration aus .env laden ----------------------------------------
@@ -62,6 +62,16 @@ for schluessel, vorgabe in [
         st.session_state[schluessel] = vorgabe
 
 ctx: AnalysisContext = st.session_state.ctx
+
+
+def daten_laden(ctx: AnalysisContext):
+    """Laedt die Messwerte und ergaenzt sie ggf. um Prognosewerte."""
+    labels, base = load_base_measures(ctx)
+    prognose: set[str] = set()
+    if ctx.prognose_jahre:
+        labels, base, prognose = forecast.predict(labels, base,
+                                                  ctx.prognose_jahre)
+    return labels, base, prognose
 
 
 def _modus_gewechselt() -> None:
@@ -189,8 +199,12 @@ col_chat, col_chart = st.columns([0.46, 0.54], gap="large")
 # --- Diagramm rechts -----------------------------------------------------
 with col_chart:
     if ctx.series:
-        labels, base = load_base_measures(ctx)
-        st.plotly_chart(build_figure(ctx, labels, base), width="stretch")
+        labels, base, prognose = daten_laden(ctx)
+        st.plotly_chart(build_figure(ctx, labels, base, prognose),
+                        width="stretch")
+        if prognose:
+            st.warning("Die schraffierten Werte sind **Prognosen**, "
+                       "keine gemessenen Daten.")
         st.caption(ctx.summary())
     else:
         st.info("Noch kein Diagramm. Starten Sie den Dialog links.")
@@ -265,10 +279,18 @@ if prompt := st.chat_input("Ihre Nachricht…"):
     # ueberein und es koennen keine Werte erfunden werden.
     if ctx.series:
         try:
-            labels_txt, base_txt = load_base_measures(ctx)
-            zusammenfassung = narrative.describe(ctx, labels_txt, base_txt)
+            labels_txt, base_txt, prog_txt = daten_laden(ctx)
+            zusammenfassung = narrative.describe(ctx, labels_txt, base_txt,
+                                                 prognose=prog_txt)
             if zusammenfassung:
                 reply = f"{reply}\n\n{zusammenfassung}"
+            if prog_txt and ctx.series:
+                echte = [l for l in labels_txt if l not in prog_txt]
+                werte = [v for l, v in zip(labels_txt, base_txt[ctx.series[0].key])
+                         if l not in prog_txt]
+                hinweis = forecast.guete_hinweis(echte, werte, ctx.prognose_jahre)
+                if hinweis:
+                    reply += f"\n\n_{hinweis}_"
         except Exception:  # noqa: BLE001 - Text ist optional, Diagramm zaehlt
             pass
 

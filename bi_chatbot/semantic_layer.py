@@ -149,6 +149,14 @@ def set_filter(ctx: AnalysisContext, region: str | None = None,
             )
         ctx.region = REGIONS[key]
     if jahr:
+        from .db import available_years
+        vorhanden = available_years()
+        if vorhanden and jahr not in vorhanden:
+            raise ValueError(
+                f"Für {jahr} liegen keine Daten vor. Verfügbar: "
+                f"{vorhanden[0]}–{vorhanden[-1]}. Für eine Schätzung sagen Sie "
+                f"z. B. „Prognose für {jahr}“."
+            )
         ctx.jahr = jahr
 
 
@@ -180,6 +188,22 @@ def set_group_by(ctx: AnalysisContext, group_by: str) -> None:
             f"{', '.join(g.label for g in GROUPINGS.values())}."
         )
     ctx.group_by = key
+
+
+def set_prognose(ctx: AnalysisContext, jahre: list[int] | None) -> None:
+    """Aktiviert die Trendprognose fuer die genannten Jahre.
+
+    Die Prognose ist nur auf der Jahresachse sinnvoll; die Achse wird daher
+    mitgesetzt. Eine leere Liste hebt die Prognose auf.
+    """
+    if not jahre:
+        ctx.prognose_jahre = []
+        return
+    gueltig = [int(j) for j in jahre if 1900 < int(j) < 2200]
+    if not gueltig:
+        raise ValueError("Bitte ein Jahr zwischen 1900 und 2200 angeben.")
+    ctx.prognose_jahre = sorted(set(gueltig))
+    ctx.group_by = "jahr"
 
 
 def set_kategorie_filter(ctx: AnalysisContext, kategorie: str | None) -> None:
@@ -269,6 +293,16 @@ def compute_series_values(key: str, base: dict[str, list[float]],
     return [a + b for a, b in zip(lv, rv)]
 
 
+def _jahre_text() -> str:
+    """Jahre mit Datenbestand -- damit das LLM keine erfindet."""
+    try:
+        from .db import available_years
+        j = available_years()
+        return f"{j[0]}-{j[-1]}" if j else "unbekannt"
+    except Exception:  # noqa: BLE001
+        return "unbekannt"
+
+
 def describe_for_prompt(ctx: AnalysisContext) -> str:
     """Kontextbeschreibung fuer den System-Prompt (RAG-artige Erdung)."""
     kpis = ", ".join(f"{k} = {l} {o} {r}" for k, (l, o, r) in ctx.kpis.items()) or "keine"
@@ -279,6 +313,7 @@ def describe_for_prompt(ctx: AnalysisContext) -> str:
         f"Verfuegbare Regionen: {', '.join(REGIONS.values())}\n"
         f"Moegliche Achsen (group_by): {', '.join(GROUPINGS)}\n"
         f"Verfuegbare Kategorien: {', '.join(KATEGORIEN.values())}\n"
+        f"Verfuegbare Jahre: {_jahre_text()}\n"
         f"Kategoriefilter: {ctx.kategorie or 'keiner'}\n"
         f"Quartalsfilter: {('Q' + str(ctx.quartal)) if ctx.quartal else 'keiner'}\n"
         f"Definierte KPIs: {kpis}\n"

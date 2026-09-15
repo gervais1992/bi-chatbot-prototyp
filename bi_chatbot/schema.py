@@ -17,9 +17,11 @@ Action = Literal[
     "set_workday_filter",  # nur Werktage / auch Wochenenden
     "set_quartal_filter",  # auf ein Quartal einschraenken (Q1..Q4)
     "set_kategorie_filter",  # auf eine Produktkategorie einschraenken
+    "set_prognose",        # Trendprognose fuer Jahre ohne Daten
     "add_series",        # zusaetzliche Reihe (Kennzahl oder KPI) einblenden
     "define_kpi",        # neue Kennzahl zur Laufzeit definieren
-    "none",              # Smalltalk / nichts zu tun
+    "inform",            # bewusste Auskunft (z.B. Jahr ohne Daten) -- endgueltig
+    "none",              # nicht verstanden / nichts zu tun
 ]
 
 
@@ -40,6 +42,10 @@ class Interpretation(BaseModel):
             "region", "kategorie", "produkt", "segment", "branche"]
     ] = Field(None, description="Achse der Auswertung (fuer set_group_by): "
                                 "Zeitachse oder Sachdimension.")
+    prognose_jahre: Optional[list[int]] = Field(
+        None, description="Jahre, fuer die eine Prognose berechnet werden soll "
+                          "(fuer set_prognose), z.B. [2026]."
+    )
     kategorie: Optional[str] = Field(
         None, description="'hardware', 'software' oder 'service' "
                           "(fuer set_kategorie_filter)."

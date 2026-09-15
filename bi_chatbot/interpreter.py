@@ -33,6 +33,9 @@ REGELN fuer das Feld `reply`:
    (z.B. "Umsätze", "Kosten"), waehle IMMER action=show_measure -- nur so
    entsteht ein Diagramm. `set_filter` allein erzeugt kein Diagramm.
 6. Behaupte nie, ein Diagramm zeige etwas, wenn keines vorhanden ist.
+7. Nennt der Nutzer ein Jahr, das nicht im Datenbestand liegt (siehe
+   "Verfuegbare Jahre" im Kontext), waehle action=inform und sage klar, dass
+   dafuer keine Daten vorliegen. Erfinde niemals Daten fuer solche Jahre.
 
 BEISPIELE:
 Nutzer: "Welche Verkaufszahlen gibt es fuer 2025?"
@@ -49,6 +52,9 @@ Nutzer: "Nimm bitte das Inland"
 
 Nutzer: "Wie hoch war der Umsatz?"
 -> action=none, reply="Die Werte sehen Sie im Diagramm rechts."
+
+Nutzer: "Zeige den Umsatz von 2016"   (2016 liegt nicht im Datenbestand)
+-> action=inform, reply="Für 2016 liegen keine Daten vor."
 
 Kontext:
 {context}
@@ -164,6 +170,40 @@ def interpret_rule_based(message: str, ctx: AnalysisContext) -> Interpretation:
             and "umsatz" not in m and "kosten" not in m:
         return Interpretation(action="set_group_by", group_by="monat",
                               reply="Die Auswertung ist jetzt nach Monaten gruppiert.")
+
+    # --- Prognose ---
+    import re as _re2
+    jahre_im_text = [int(j) for j in _re2.findall(r"\b(19\d{2}|20\d{2})\b", m)]
+
+    # Nennt der Nutzer ein Jahr ohne Datenbestand, darf das nicht stillschweigend
+    # ignoriert werden -- sonst zeigt das Diagramm ein anderes Jahr als gefragt.
+    if jahre_im_text and not any(w in m for w in ("prognose", "vorhersage",
+                                                 "schätz", "schaetz",
+                                                 "hochrechnung", "forecast")):
+        from .db import available_years
+        vorhanden = available_years()
+        fehlend = [j for j in jahre_im_text if j not in vorhanden]
+        if fehlend and vorhanden:
+            jahr = fehlend[0]
+            return Interpretation(
+                action="inform",
+                reply=(f"Für {jahr} liegen keine Daten vor. Verfügbar: "
+                       f"{vorhanden[0]}–{vorhanden[-1]}. Für eine Schätzung "
+                       f"sagen Sie „Prognose für {jahr}“."))
+
+    if "ohne prognose" in m or "keine prognose" in m:
+        return Interpretation(action="set_prognose", prognose_jahre=[],
+                              reply="Die Prognose ist ausgeblendet.")
+    if any(w in m for w in ("prognose", "vorhersage", "schätz", "schaetz",
+                            "hochrechnung", "forecast")):
+        if jahre_im_text:
+            return Interpretation(action="set_prognose",
+                                  prognose_jahre=jahre_im_text,
+                                  reply="Prognose berechnet – die Werte sind "
+                                        "geschätzt, keine Messwerte.")
+        return Interpretation(action="inform",
+                              reply="Für welches Jahr soll ich die Prognose "
+                                    "berechnen? Zum Beispiel „Prognose für 2026“.")
 
     # --- Mehrjahresvergleich in einer Nachricht ---
     if ("letzt" in m or "vergangen" in m) and "jahr" in m:
@@ -328,6 +368,9 @@ def default_reply(interp: Interpretation, ctx: AnalysisContext) -> str:
     if a == "set_group_by":
         achse = _ACHSEN_TEXT.get(interp.group_by or "", "Monaten")
         return f"Die Auswertung ist jetzt nach {achse} gruppiert."
+    if a == "set_prognose":
+        return ("Prognose berechnet – die Werte sind geschätzt."
+                if interp.prognose_jahre else "Die Prognose ist ausgeblendet.")
     if a == "set_kategorie_filter":
         return (f"Die Auswertung ist auf {interp.kategorie.capitalize()} eingeschränkt."
                 if interp.kategorie else "Der Kategoriefilter ist aufgehoben.")
@@ -389,6 +432,10 @@ def apply(interp: Interpretation, ctx: AnalysisContext) -> str:
             sem.set_chart_type(ctx, interp.chart_type or "line")
         elif a == "set_group_by":
             sem.set_group_by(ctx, interp.group_by or "monat")
+        elif a == "set_prognose":
+            sem.set_prognose(ctx, interp.prognose_jahre)
+            if not ctx.series:          # ohne Reihe waere nichts zu sehen
+                sem.show_measure(ctx, "umsatz", chart_type="bar")
         elif a == "set_kategorie_filter":
             sem.set_kategorie_filter(ctx, interp.kategorie or None)
         elif a == "set_quartal_filter":
@@ -400,7 +447,7 @@ def apply(interp: Interpretation, ctx: AnalysisContext) -> str:
                            interp.kpi_expression or "umsatz - kosten")
         elif a == "add_series":
             sem.add_series(ctx, (interp.series_key or "").lower())
-        # list_data / none: keine Zustandsaenderung
+        # list_data / inform / none: keine Zustandsaenderung
     except ValueError as e:
         # Der Befehl wurde abgelehnt: die (ggf. erfundene) Modellantwort waere
         # irrefuehrend. Stattdessen die Fehlerursache verstaendlich melden.

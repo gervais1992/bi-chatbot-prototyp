@@ -49,6 +49,17 @@ def available_regions(jahr: int = 2025) -> list[str]:
     return [r[0] for r in rows]
 
 
+def available_years() -> list[int]:
+    """Alle Jahre, fuer die tatsaechlich Daten vorliegen."""
+    con = _connect()
+    try:
+        rows = con.execute(
+            "SELECT DISTINCT jahr FROM dim_zeit ORDER BY jahr").fetchall()
+    finally:
+        con.close()
+    return [int(r[0]) for r in rows]
+
+
 def load_base_measures(
     ctx: AnalysisContext,
 ) -> tuple[list[str], dict[str, list[float]]]:
