@@ -416,3 +416,49 @@ def test_prognose_aufheben():
     assert ctx.prognose_jahre == [2026]
     sem.set_prognose(ctx, [])
     assert ctx.prognose_jahre == []
+
+
+# --- Abweichungsanalyse --------------------------------------------------
+def test_abweichungsanalyse_zerlegt_differenz():
+    """Die Teilbetraege muessen sich exakt zur Gesamtdifferenz summieren."""
+    from bi_chatbot import variance
+    ctx = AnalysisContext()
+    erg = variance.analyse(ctx, 2023, 2024)
+    assert erg["jahr_a"] == 2023 and erg["jahr_b"] == 2024
+    assert abs(erg["delta"] - (erg["wert_b"] - erg["wert_a"])) < 1.0
+    # Mengen- und Preiseffekt ergeben zusammen die Gesamtdifferenz
+    assert abs(erg["mengeneffekt"] + erg["preiseffekt"] - erg["delta"]) < 1.0
+    # Beitraege je Dimension summieren sich ebenfalls zur Differenz
+    for posten in erg["beitraege"].values():
+        assert abs(sum(x["delta"] for x in posten) - erg["delta"]) < 1.0
+
+
+def test_dialog_unterschied_zwischen_jahren():
+    ctx = AnalysisContext()
+    interp = nlu.interpret_rule_based(
+        "unterschied zwischen umsatz 2023 und 2024", ctx)
+    assert interp.action == "compare_periods"
+    antwort = nlu.apply(interp, ctx)
+    assert "Abweichungsanalyse" in antwort
+    assert ctx.group_by == "jahr"
+    assert ctx.jahre_auswahl == [2023, 2024]
+    assert ctx.prognose_jahre == []      # Prognose wurde zurueckgesetzt
+
+
+def test_jahresauswahl_beschraenkt_diagramm():
+    from bi_chatbot.db import load_base_measures
+    ctx = AnalysisContext()
+    sem.show_measure(ctx, "umsatz")
+    sem.set_jahre_auswahl(ctx, [2023, 2024])
+    labels, _ = load_base_measures(ctx)
+    assert labels == ["2023", "2024"]
+    sem.set_jahre_auswahl(ctx, [])
+    labels, _ = load_base_measures(ctx)
+    assert len(labels) >= 3
+
+
+def test_jahresauswahl_lehnt_unbekanntes_jahr_ab():
+    import pytest
+    ctx = AnalysisContext()
+    with pytest.raises(ValueError):
+        sem.set_jahre_auswahl(ctx, [2023, 1999])

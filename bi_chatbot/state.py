@@ -26,6 +26,7 @@ class AnalysisContext:
     quartal: int | None = None                 # 1..4, None = alle Quartale
     kategorie: str | None = None               # Hardware | Software | Service
     prognose_jahre: list[int] = field(default_factory=list)  # extrapolierte Jahre
+    jahre_auswahl: list[int] = field(default_factory=list)   # nur diese Jahre zeigen
     group_by: str = "monat"                    # Zeitachse, siehe GROUPINGS
     nur_werktage: bool = False                 # Wochenenden ausblenden
     chart_type: str = "line"                   # 'line' | 'bar'

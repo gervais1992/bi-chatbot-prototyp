@@ -175,6 +175,29 @@ def interpret_rule_based(message: str, ctx: AnalysisContext) -> Interpretation:
     import re as _re2
     jahre_im_text = [int(j) for j in _re2.findall(r"\b(19\d{2}|20\d{2})\b", m)]
 
+    # --- Zielwertsuche: "Was haette ich tun muessen, um X zu erreichen?" ---
+    if len(jahre_im_text) >= 2 and any(
+            w in m for w in ("erreichen", "erreicht", "nötig", "noetig",
+                             "tun müssen", "tun muessen", "hätte", "haette",
+                             "zielwert", "was wäre", "was waere")):
+        kennzahl = "kosten" if "kosten" in m and "umsatz" not in m else "umsatz"
+        # Muster: "<Ziel> bereits im Jahr <Basis>" -> das spaetere Jahr ist Ziel
+        ziel, basis = max(jahre_im_text[:2]), min(jahre_im_text[:2])
+        return Interpretation(action="goal_seek", basis_jahr=basis,
+                              ziel_jahr=ziel, measure=kennzahl,
+                              chart_type="bar",
+                              reply="Zielwertsuche berechnet.")
+
+    # --- Abweichungsanalyse: "Unterschied zwischen 2023 und 2024" ---
+    if len(jahre_im_text) >= 2 and any(
+            w in m for w in ("unterschied", "differenz", "vergleich", "warum",
+                             "woher", "abweichung", "veränderung", "veraenderung")):
+        kennzahl = "kosten" if "kosten" in m and "umsatz" not in m else "umsatz"
+        return Interpretation(action="compare_periods",
+                              vergleich_jahre=jahre_im_text[:2],
+                              measure=kennzahl, chart_type="bar",
+                              reply="Abweichungsanalyse berechnet.")
+
     # Nennt der Nutzer ein Jahr ohne Datenbestand, darf das nicht stillschweigend
     # ignoriert werden -- sonst zeigt das Diagramm ein anderes Jahr als gefragt.
     if jahre_im_text and not any(w in m for w in ("prognose", "vorhersage",
@@ -432,6 +455,33 @@ def apply(interp: Interpretation, ctx: AnalysisContext) -> str:
             sem.set_chart_type(ctx, interp.chart_type or "line")
         elif a == "set_group_by":
             sem.set_group_by(ctx, interp.group_by or "monat")
+        elif a == "goal_seek":
+            basis, ziel = interp.basis_jahr, interp.ziel_jahr
+            if not basis or not ziel:
+                return ("Bitte Basis- und Zieljahr nennen, z. B. „Was hätte ich "
+                        "tun müssen, um den Umsatz von 2025 schon 2023 zu "
+                        "erreichen?“")
+            sem.show_measure(ctx, interp.measure or "umsatz",
+                             chart_type=interp.chart_type or "bar")
+            sem.set_jahre_auswahl(ctx, sorted({basis, ziel}))
+            sem.set_prognose(ctx, [])
+            from . import goalseek
+            return goalseek.describe(
+                goalseek.analyse(ctx, basis, ziel_jahr=ziel,
+                                 kennzahl=interp.measure or "umsatz"))
+        elif a == "compare_periods":
+            jahre = sorted((interp.vergleich_jahre or [])[:2])
+            if len(jahre) < 2:
+                return ("Bitte zwei Jahre nennen, z. B. "
+                        "„Unterschied zwischen 2023 und 2024“.")
+            sem.show_measure(ctx, interp.measure or "umsatz",
+                             chart_type=interp.chart_type or "bar")
+            sem.set_jahre_auswahl(ctx, jahre)
+            sem.set_prognose(ctx, [])       # Prognose stoert den Vergleich
+            from . import variance
+            return variance.describe(
+                variance.analyse(ctx, jahre[0], jahre[1],
+                                 interp.measure or "umsatz"))
         elif a == "set_prognose":
             sem.set_prognose(ctx, interp.prognose_jahre)
             if not ctx.series:          # ohne Reihe waere nichts zu sehen

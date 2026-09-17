@@ -77,7 +77,13 @@ def load_base_measures(
     where: list[str] = []
     params: list = []
     # Beim Jahresvergleich darf der Jahresfilter nicht greifen.
-    if ctx.group_by != "jahr":
+    if ctx.group_by == "jahr":
+        # Jahresachse: optional auf ausgewaehlte Jahre beschraenken
+        if ctx.jahre_auswahl:
+            platzhalter = ", ".join("?" for _ in ctx.jahre_auswahl)
+            where.append(f"z.jahr IN ({platzhalter})")
+            params.extend(ctx.jahre_auswahl)
+    else:
         where.append("z.jahr = ?")
         params.append(ctx.jahr)
     if ctx.region:

@@ -190,6 +190,23 @@ def set_group_by(ctx: AnalysisContext, group_by: str) -> None:
     ctx.group_by = key
 
 
+def set_jahre_auswahl(ctx: AnalysisContext, jahre: list[int] | None) -> None:
+    """Beschraenkt die Jahresachse auf bestimmte Jahre (leer = alle)."""
+    if not jahre:
+        ctx.jahre_auswahl = []
+        return
+    from .db import available_years
+    vorhanden = available_years()
+    fehlend = [j for j in jahre if j not in vorhanden]
+    if fehlend:
+        raise ValueError(
+            f"Für {fehlend[0]} liegen keine Daten vor. Verfügbar: "
+            f"{vorhanden[0]}–{vorhanden[-1]}."
+        )
+    ctx.jahre_auswahl = sorted(set(jahre))
+    ctx.group_by = "jahr"
+
+
 def set_prognose(ctx: AnalysisContext, jahre: list[int] | None) -> None:
     """Aktiviert die Trendprognose fuer die genannten Jahre.
 

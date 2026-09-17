@@ -18,6 +18,8 @@ Action = Literal[
     "set_quartal_filter",  # auf ein Quartal einschraenken (Q1..Q4)
     "set_kategorie_filter",  # auf eine Produktkategorie einschraenken
     "set_prognose",        # Trendprognose fuer Jahre ohne Daten
+    "compare_periods",     # Abweichungsanalyse zwischen zwei Jahren
+    "goal_seek",           # Zielwertsuche: was waere noetig gewesen?
     "add_series",        # zusaetzliche Reihe (Kennzahl oder KPI) einblenden
     "define_kpi",        # neue Kennzahl zur Laufzeit definieren
     "inform",            # bewusste Auskunft (z.B. Jahr ohne Daten) -- endgueltig
@@ -42,6 +44,17 @@ class Interpretation(BaseModel):
             "region", "kategorie", "produkt", "segment", "branche"]
     ] = Field(None, description="Achse der Auswertung (fuer set_group_by): "
                                 "Zeitachse oder Sachdimension.")
+    vergleich_jahre: Optional[list[int]] = Field(
+        None, description="Genau zwei Jahre fuer die Abweichungsanalyse "
+                          "(fuer compare_periods), z.B. [2023, 2024]."
+    )
+    basis_jahr: Optional[int] = Field(
+        None, description="Jahr, in dem das Ziel haette erreicht werden sollen "
+                          "(fuer goal_seek)."
+    )
+    ziel_jahr: Optional[int] = Field(
+        None, description="Jahr, dessen Wert als Ziel dient (fuer goal_seek)."
+    )
     prognose_jahre: Optional[list[int]] = Field(
         None, description="Jahre, fuer die eine Prognose berechnet werden soll "
                           "(fuer set_prognose), z.B. [2026]."
