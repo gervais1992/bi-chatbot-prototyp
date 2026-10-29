@@ -1,7 +1,5 @@
 # BI-Chatbot – Prototyp
 
-*Deutsche Fassung · [Version française](README.md)*
-
 Prototyp eines **lernfähigen Chatbots zur interaktiven Erstellung von
 Business-Intelligence-Auswertungen**. Der Nutzer erstellt im Dialog eine
 Auswertung, ändert Diagrammtypen, blendet Reihen ein und definiert Kennzahlen
